@@ -34,7 +34,26 @@ def estimate_system_parameters(setpoint, feedback, actuator, use_actuator):
     Kp = coeffs[0]  # 增益
     tau_raw = 1 / max(abs(coeffs))  # 初步時間常數估算
     wn = 1 / tau_raw  # 自然頻率
-    zeta = 0.7  # 阻尼比 (預設值)
+
+    # **估算阻尼比 zeta**
+    # 找到正向和負向的峰值
+    positive_peaks, _ = find_peaks(feedback)  # 正向峰值
+    negative_peaks, _ = find_peaks(-feedback)  # 負向峰值（取負值後檢測）
+
+    # 合併正向和負向峰值，並按時間順序排序
+    all_peaks = np.sort(np.concatenate((positive_peaks, negative_peaks)))
+
+    if len(all_peaks) > 1:
+        peak_values = feedback[all_peaks]
+        decay_ratio = abs(peak_values[1]) / abs(peak_values[0])  # 衰減比（取絕對值）
+        zeta = -np.log(decay_ratio) / np.sqrt(np.pi**2 + np.log(decay_ratio)**2)  # 計算阻尼比
+    elif len(all_peaks) == 1:
+        # 如果只有一個峰值，假設阻尼比為中等值
+        zeta = 0.7
+    else:
+        # 如果沒有峰值，假設系統是過阻尼的
+        zeta = 1.0
+    
     tau = estimate_time_constant(wn, zeta)  # 計算時間常數
 
     return Kp, wn, zeta, tau
@@ -52,7 +71,7 @@ def create_transfer_function(time, setpoint, feedback, actuator, use_actuator):
 
 # **計算步階響應**
 def compute_step_response(system):
-    time_out, response = ctrl.step_response(system, T=10)
+    time_out, response = ctrl.step_response(system, T=100)
     return time_out, response
 
 # **繪製步階響應**
@@ -64,7 +83,7 @@ def plot_step_response(time_out, response, Kp, wn, zeta, tau, use_actuator):
     plt.axhline(y=1, color='r', linestyle='--', label='Target: 1')
     plt.xlabel('Time (s)')
     plt.ylabel('Response')
-    plt.xlim([0, 10])
+    # plt.xlim([0, 10])
     plt.legend()
     plt.title(f'System Identification - Step Response ({actuator_str})')
     plt.show()
