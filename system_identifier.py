@@ -4,6 +4,7 @@ import control as ctrl
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from scipy.linalg import lstsq
+import argparse
 
 # **讀取 CSV 數據**
 def load_data(filename):
@@ -36,11 +37,8 @@ def estimate_system_parameters(setpoint, feedback, actuator, use_actuator):
     wn = 1 / tau_raw  # 自然頻率
 
     # **估算阻尼比 zeta**
-    # 找到正向和負向的峰值
     positive_peaks, _ = find_peaks(feedback)  # 正向峰值
     negative_peaks, _ = find_peaks(-feedback)  # 負向峰值（取負值後檢測）
-
-    # 合併正向和負向峰值，並按時間順序排序
     all_peaks = np.sort(np.concatenate((positive_peaks, negative_peaks)))
 
     if len(all_peaks) > 1:
@@ -48,57 +46,76 @@ def estimate_system_parameters(setpoint, feedback, actuator, use_actuator):
         decay_ratio = abs(peak_values[1]) / abs(peak_values[0])  # 衰減比（取絕對值）
         zeta = -np.log(decay_ratio) / np.sqrt(np.pi**2 + np.log(decay_ratio)**2)  # 計算阻尼比
     elif len(all_peaks) == 1:
-        # 如果只有一個峰值，假設阻尼比為中等值
-        zeta = 0.7
+        zeta = 0.7  # 假設阻尼比為中等值
     else:
-        # 如果沒有峰值，假設系統是過阻尼的
-        zeta = 1.0
-    
-    tau = estimate_time_constant(wn, zeta)  # 計算時間常數
+        zeta = 1.0  # 假設系統是過阻尼的
 
+    tau = estimate_time_constant(wn, zeta)  # 計算時間常數
     return Kp, wn, zeta, tau
 
 # **建立傳遞函數**
-def create_transfer_function(time, setpoint, feedback, actuator, use_actuator):
-    """根據 `use_actuator` 來決定是否納入 `actuator` 參考"""
+def create_transfer_function(order, time, setpoint, feedback, actuator, use_actuator):
+    """根據指定的階數建立傳遞函數"""
     Kp, wn, zeta, tau = estimate_system_parameters(setpoint, feedback, actuator, use_actuator)
 
-    num = [Kp * wn**2]  
-    den = [1, 2 * zeta * wn, wn**2]
-    system = ctrl.TransferFunction(num, den)
+    if order == 1:
+        # 一階模型
+        num = [Kp]
+        den = [tau, 1]
+    elif order == 2:
+        # 二階模型
+        num = [Kp * wn**2]
+        den = [1, 2 * zeta * wn, wn**2]
+    elif order == 3:
+        # 三階模型
+        num = [Kp * wn**2]
+        den = [tau, 1, 2 * zeta * wn, wn**2]
+    else:
+        raise ValueError("Unsupported model order. Please choose 1, 2, or 3.")
 
+    system = ctrl.TransferFunction(num, den)
     return system, Kp, wn, zeta, tau
 
 # **計算步階響應**
 def compute_step_response(system):
-    time_out, response = ctrl.step_response(system, T=100)
+    time_out, response = ctrl.step_response(system, T=np.linspace(0, 10, 201))
     return time_out, response
 
 # **繪製步階響應**
-def plot_step_response(time_out, response, Kp, wn, zeta, tau, use_actuator):
+def plot_step_response(time_out, response, Kp, wn, zeta, tau, order, use_actuator):
     actuator_str = "with Actuator" if use_actuator else "without Actuator"
-    
     plt.figure(figsize=(10, 5))
-    plt.plot(time_out, response, label=f'Step Response {actuator_str} (Kp={Kp:.2f}, wn={wn:.2f}, ζ={zeta:.2f}, τ={tau:.2f})', color='blue')
+    plt.plot(time_out, response, label=f'Step Response (Order={order}, {actuator_str})\nKp={Kp:.2f}, wn={wn:.2f}, ζ={zeta:.2f}, τ={tau:.2f}', color='blue')
     plt.axhline(y=1, color='r', linestyle='--', label='Target: 1')
     plt.xlabel('Time (s)')
     plt.ylabel('Response')
-    # plt.xlim([0, 10])
     plt.legend()
-    plt.title(f'System Identification - Step Response ({actuator_str})')
+    plt.title(f'System Identification - Step Response (Order={order}, {actuator_str})')
+    plt.grid()
     plt.show()
 
 # **執行分析**
 if __name__ == "__main__":
-    filename = "inverted_pendulum_data_tracking_fixed.csv"
+    # **解析命令列參數**
+    parser = argparse.ArgumentParser(description="System Identification with Transfer Function Models")
+    parser.add_argument("--filename", type=str, required=True, help="Path to the input CSV file")
+    parser.add_argument("--order", type=int, required=True, choices=[1, 2, 3], help="Order of the transfer function (1, 2, or 3)")
+    parser.add_argument("--use_actuator", action="store_true", help="Include actuator in the system identification")
+    args = parser.parse_args()
+
+    # **讀取數據**
+    filename = args.filename
+    order = args.order
+    use_actuator = args.use_actuator
     time, setpoint, feedback, actuator = load_data(filename)
 
     # **不使用 `actuator`**
-    system_no_act, Kp_no_act, wn_no_act, zeta_no_act, tau_no_act = create_transfer_function(time, setpoint, feedback, actuator, use_actuator=False)
+    system_no_act, Kp_no_act, wn_no_act, zeta_no_act, tau_no_act = create_transfer_function(order, time, setpoint, feedback, actuator, use_actuator=False)
     time_out, response = compute_step_response(system_no_act)
-    plot_step_response(time_out, response, Kp_no_act, wn_no_act, zeta_no_act, tau_no_act, use_actuator=False)
+    plot_step_response(time_out, response, Kp_no_act, wn_no_act, zeta_no_act, tau_no_act, order, use_actuator=False)
 
-    # **使用 `actuator`**
-    system_act, Kp_act, wn_act, zeta_act, tau_act = create_transfer_function(time, setpoint, feedback, actuator, use_actuator=True)
-    time_out, response = compute_step_response(system_act)
-    plot_step_response(time_out, response, Kp_act, wn_act, zeta_act, tau_act, use_actuator=True)
+    # **使用 `actuator`（僅在指定 --use_actuator 時執行）**
+    if use_actuator:
+        system_act, Kp_act, wn_act, zeta_act, tau_act = create_transfer_function(order, time, setpoint, feedback, actuator, use_actuator=True)
+        time_out, response = compute_step_response(system_act)
+        plot_step_response(time_out, response, Kp_act, wn_act, zeta_act, tau_act, order, use_actuator=True)
