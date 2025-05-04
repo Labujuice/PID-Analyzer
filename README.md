@@ -32,18 +32,35 @@ pip install -r requirements.txt
 
 ## Usage
 1. **Generate TEST Data**: Use `data_generator_inverted_pendulum.py` to generate system data.
-    ```bash
-    python data_generator_inverted_pendulum.py
-    ```
-    This will create a CSV file named inverted_pendulum_data_tracking_fixed.csv.
+  ```bash
+  python data_generator_inverted_pendulum.py
+  ```
+  This will create a CSV file named inverted_pendulum_data_tracking_fixed.csv.
 
-2. **Perform System Identification**: Run system_identifier.py to analyze the generated data.
-    ```bash
-    python system_identifier.py
-    ```
-    The script will display step response plots and provide system parameters such as gain (`Kp`), natural frequency (`wn`), damping ratio (`ζ`), and time constant (`τ`).
+2. **Perform System Identification**: Run `system_identifier.py` to analyze the generated or custom data.
+  ```bash
+  python system_identifier.py --filename <input_csv_file> --order <model_order> [--use_actuator]
+  ```
+  - **Parameters**:
+      - `--filename`: Path to the input CSV file (e.g., [inverted_pendulum_data_tracking_fixed.csv](http://_vscodecontentref_/0)).
+      - `--order`: Specify the order of the transfer function model (1, 2, or 3).
+      - `--use_actuator`: Optional flag to include actuator data in the system identification.
 
-3. **Integrate Logs(Feature)**: Replace the input CSV file with your PX4 `ulog` or Betaflight log data for custom analysis.
+  - **Example**:
+      ```bash
+      python system_identifier.py --filename inverted_pendulum_data_tracking_fixed.csv --order 2 --use_actuator
+      ```
+
+  - **Output**:
+      - Displays step response plots for the specified model order.
+      - Provides system parameters such as:
+          - Gain (`Kp`)
+          - Natural frequency (`wn`)
+          - Damping ratio (`ζ`)
+          - Time constant (`τ`)
+      - Saves results in a structured CSV format for further analysis.
+
+1. **Integrate Logs(Feature)**: Replace the input CSV file with your PX4 `ulog` or Betaflight log data for custom analysis.
 
 ## File Structure
 ```
