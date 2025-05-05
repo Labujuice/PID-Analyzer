@@ -4,6 +4,7 @@ import control as ctrl
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from scipy.linalg import lstsq
+from scipy.signal import savgol_filter
 import argparse
 
 # **讀取 CSV 數據**
@@ -36,15 +37,33 @@ def estimate_system_parameters(setpoint, feedback, actuator, use_actuator):
     tau_raw = 1 / max(abs(coeffs))  # 初步時間常數估算
     wn = 1 / tau_raw  # 自然頻率
 
-    # **估算阻尼比 zeta**
-    positive_peaks, _ = find_peaks(feedback)  # 正向峰值
-    negative_peaks, _ = find_peaks(-feedback)  # 負向峰值（取負值後檢測）
+    # 平滑處理
+    feedback = savgol_filter(feedback, window_length=11, polyorder=2)
+
+    # 檢測峰值
+    positive_peaks, _ = find_peaks(feedback, height=0.01, distance=10)
+    negative_peaks, _ = find_peaks(-feedback, height=0.01, distance=10)
     all_peaks = np.sort(np.concatenate((positive_peaks, negative_peaks)))
 
     if len(all_peaks) > 1:
+        # 基於衰減比計算
         peak_values = feedback[all_peaks]
-        decay_ratio = abs(peak_values[1]) / abs(peak_values[0])  # 衰減比（取絕對值）
-        zeta = -np.log(decay_ratio) / np.sqrt(np.pi**2 + np.log(decay_ratio)**2)  # 計算阻尼比
+        print(f"All peaks: {all_peaks}, Peak values: {peak_values}")  # 調試用
+        decay_ratio = abs(peak_values[1]) / abs(peak_values[0])
+        decay_ratio = max(min(decay_ratio, 0.99), 0.01)  # 限制範圍
+        zeta_decay = -np.log(decay_ratio) / np.sqrt(np.pi**2 + np.log(decay_ratio)**2)
+
+        # 基於振盪頻率計算
+        time_intervals = np.diff(all_peaks)  # 峰值間距
+        if len(time_intervals) > 0:
+            avg_period = np.mean(time_intervals)  # 平均周期
+            wd = 2 * np.pi / avg_period  # 振盪頻率
+            zeta_freq = np.sqrt(1 - (wd / wn)**2) if wd < wn else 0.7  # 確保值合理
+        else:
+            zeta_freq = 0.7  # 默認值
+
+        # 綜合兩種方法
+        zeta = (zeta_decay + zeta_freq) / 2
     elif len(all_peaks) == 1:
         zeta = 0.7  # 假設阻尼比為中等值
     else:
