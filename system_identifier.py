@@ -8,13 +8,14 @@ from scipy.signal import savgol_filter
 import argparse
 
 # **讀取 CSV 數據**
-def load_data(filename):
+def load_data(filename, time_col, input_col, output_col, actuator_col):
     df = pd.read_csv(filename)
-    time = df["time"].values.ravel()
-    setpoint = df["input"].values.ravel()
-    feedback = df["output"].values.ravel()
-    actuator = df["actuator"].values.ravel()
+    time = df[time_col].values.ravel()
+    setpoint = df[input_col].values.ravel()
+    feedback = df[output_col].values.ravel()
+    actuator = df[actuator_col].values.ravel()
     return time, setpoint, feedback, actuator
+
 
 # **估計時間常數**
 def estimate_time_constant(wn, zeta):
@@ -120,13 +121,20 @@ if __name__ == "__main__":
     parser.add_argument("--filename", type=str, required=True, help="Path to the input CSV file")
     parser.add_argument("--order", type=int, required=True, choices=[1, 2, 3], help="Order of the transfer function (1, 2, or 3)")
     parser.add_argument("--use_actuator", action="store_true", help="Include actuator in the system identification")
+    parser.add_argument("--time_col", type=str, default="time", help="Column name for time (default: time)")
+    parser.add_argument("--input_col", type=str, default="input", help="Column name for input/setpoint (default: input)")
+    parser.add_argument("--output_col", type=str, default="output", help="Column name for output/feedback (default: output)")
+    parser.add_argument("--actuator_col", type=str, default="actuator", help="Column name for actuator (default: actuator)")
     args = parser.parse_args()
+
 
     # **讀取數據**
     filename = args.filename
     order = args.order
     use_actuator = args.use_actuator
-    time, setpoint, feedback, actuator = load_data(filename)
+    time, setpoint, feedback, actuator = load_data(
+        args.filename, args.time_col, args.input_col, args.output_col, args.actuator_col
+    )
 
     # **不使用 `actuator`**
     system_no_act, Kp_no_act, wn_no_act, zeta_no_act, tau_no_act = create_transfer_function(order, time, setpoint, feedback, actuator, use_actuator=False)
