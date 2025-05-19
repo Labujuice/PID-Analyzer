@@ -127,19 +127,6 @@ def compute_step_response(system):
     time_out, response = ctrl.step_response(system, T=np.linspace(0, 10, 201))
     return time_out, response
 
-# **繪製步階響應**
-def plot_step_response(time_out, response, Kp, wn, zeta, tau, order, use_actuator):
-    actuator_str = "with Actuator" if use_actuator else "without Actuator"
-    plt.figure(figsize=(10, 5))
-    plt.plot(time_out, response, label=f'Step Response (Order={order}, {actuator_str})\nKp={Kp:.2f}, wn={wn:.2f}, ζ={zeta:.2f}, τ={tau:.2f}', color='blue')
-    plt.axhline(y=1, color='r', linestyle='--', label='Target: 1')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Response')
-    plt.legend()
-    plt.title(f'System Identification - Step Response (Order={order}, {actuator_str})')
-    plt.grid()
-    plt.show()
-
 def analyze_and_plot(order, time, setpoint, feedback, actuator, use_actuator, output_folder, suffix):
     # 建立模型
     system, Kp, wn, zeta, tau = create_transfer_function(order, time, setpoint, feedback, actuator, use_actuator)
