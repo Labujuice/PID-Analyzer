@@ -39,12 +39,16 @@ pip install -r requirements.txt
 
 2. **Perform System Identification**: Run `system_identifier.py` to analyze the generated or custom data.
   ```bash
-  python system_identifier.py --filename <input_csv_file> --order <model_order> [--use_actuator]
+  python system_identifier.py --filename <input_csv_file> --order <model_order> [--use_actuator] [--time_col <col>] [--input_col <col>] [--output_col <col>] [--actuator_col <col>]
   ```
   - **Parameters**:
       - `--filename`: Path to the input CSV file (e.g., [inverted_pendulum_data_tracking_fixed.csv](http://_vscodecontentref_/0)).
       - `--order`: Specify the order of the transfer function model (1, 2, or 3).
       - `--use_actuator`: Optional flag to include actuator data in the system identification.
+      - `--time_col`: (Optional) Column name for time (default: time)
+      - `--input_col`: (Optional) Column name for input/setpoint (default: input)
+      - `--output_col`: (Optional) Column name for output/feedback (default: output)
+      - `--actuator_col`: (Optional) Column name for actuator (default: actuator)
 
   - **Example**:
       ```bash
